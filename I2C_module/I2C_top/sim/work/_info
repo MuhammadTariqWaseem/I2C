@@ -1,0 +1,110 @@
+m255
+K4
+z2
+13
+!s112 1.1
+!i10d 8192
+!i10e 25
+!i10f 100
+cModel Technology
+Z0 dE:/I2C/I2C_module/I2C_top/sim
+vI2C_master
+Z1 DXx6 sv_std 3 std 0 22 AD7iAPLo6nTIKk<N0eo=D3
+Z2 !s110 1761988011
+!i10b 1
+!s100 ?[jk]LUnc:YD8Z0?<nh^M2
+IYg4e[@H5CVM8kG1?GM[6l0
+Z3 VDg1SIo80bB@j0V0VzS_@n1
+!s105 I2C_master_sv_unit
+S1
+R0
+w1761987056
+8../../master/rtl/I2C_master.sv
+F../../master/rtl/I2C_master.sv
+L0 1
+Z4 OV;L;10.5b;63
+r1
+!s85 0
+31
+Z5 !s108 1761988011.000000
+Z6 !s107 ../../slave/rtl/I2C_slave.sv|../../master/rtl/I2C_master.sv|
+Z7 !s90 -reportprogress|300|-sv|../../master/rtl/I2C_master.sv|../../slave/rtl/I2C_slave.sv|
+!i113 1
+o-sv
+Z8 tCvgOpt 0
+n@i2@c_master
+vI2C_slave
+R1
+!s110 1761988012
+!i10b 1
+!s100 hdKF``AQa3Y2bZmiEXAKD1
+Iz`bO3ZdSL:Vlf_=4HPmQW1
+R3
+!s105 I2C_slave_sv_unit
+S1
+R0
+w1761385569
+8../../slave/rtl/I2C_slave.sv
+F../../slave/rtl/I2C_slave.sv
+L0 1
+R4
+r1
+!s85 0
+31
+R5
+R6
+R7
+!i113 1
+o-sv
+R8
+n@i2@c_slave
+vI2C_top
+R1
+R2
+!i10b 1
+!s100 Li^SnnFRnMKi=D]2@U5Oc3
+IT700o>oGUM6WZlg1?B8oh3
+R3
+!s105 I2C_top_sv_unit
+S1
+R0
+w1754422214
+8../rtl/I2C_top.sv
+F../rtl/I2C_top.sv
+L0 1
+R4
+r1
+!s85 0
+31
+Z9 !s108 1761988009.000000
+Z10 !s107 ../rtl/I2C_top.sv|tb_I2C_top.sv|
+Z11 !s90 -reportprogress|300|-sv|tb_I2C_top.sv|../rtl/I2C_top.sv|
+!i113 1
+o-sv
+R8
+n@i2@c_top
+vtb_I2C_top
+R1
+R2
+!i10b 1
+!s100 mSc7UVd[Od5PFQcgBT_?P2
+I>CZheHfnCbN[P931NzzCh3
+R3
+!s105 tb_I2C_top_sv_unit
+S1
+R0
+w1754422625
+8tb_I2C_top.sv
+Ftb_I2C_top.sv
+L0 1
+R4
+r1
+!s85 0
+31
+R9
+R10
+R11
+!i113 1
+o-sv
+R8
+ntb_@i2@c_top
