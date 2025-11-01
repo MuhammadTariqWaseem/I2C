@@ -1,0 +1,347 @@
+module processor (
+	input logic clk  ,
+	input logic reset
+);
+
+	logic [31:0] PCPlus4  ;
+	logic [31:0] PCPlus41 ;
+	logic [31:0] PCTargetE;
+	logic [31:0] PCNext   ;
+	logic [31:0] PCNext1  ;
+	logic [31:0] PC       ;
+	logic [31:0] Instr    ;
+	logic [31:0] InstrX   ;
+	logic        PCSrc    ;
+
+	logic [31:0] InstrD    ;
+	logic [31:0] InstrL    ;
+	logic [31:0] InstrK    ;
+	logic [31:0] InstrY    ;
+	logic [31:0] PCD       ;
+	logic [31:0] PCPlus4D  ;
+	logic [31:0] WriteDataW;
+	logic [31:0] RD1       ;
+	logic [31:0] RD2       ;
+	logic [31:0] ImmExt    ;
+	logic [ 4:0] WriteAddW ;
+	logic [ 2:0] ALUControl;
+	logic [ 1:0] ResultSrc ;
+	logic [ 1:0] ImmSrc    ;
+	logic        Branch    ;
+	logic        MemWrite  ;
+	logic        ALUSrc    ;
+	logic        RegWrite  ;
+	logic        Jump      ;
+	logic        RegWriteW ;
+	logic        SS1       ;
+	logic        SS2       ;
+
+	logic [31:0] RD1E          ;
+	logic [31:0] RD2E          ;
+	logic [31:0] PCE           ;
+	logic [31:0] ImmExtE       ;
+	logic [31:0] PCPlus4E      ;
+	logic [31:0] SrcE          ;
+	logic [31:0] ALUResultE    ;
+	logic [31:0] A32           ;
+	logic [31:0] B32           ;
+	logic [ 4:0] WriteAddE     ;
+	logic [ 4:0] rs1           ;
+	logic [ 4:0] rs2           ;
+	logic [ 4:0] IS1           ;
+	logic [ 4:0] IS2           ;
+	logic [ 2:0] ALUControlE   ;
+	logic [ 2:0] funct3        ;
+	logic [ 1:0] ResultSrcE    ;
+	logic [ 1:0] forword_path_A;
+	logic [ 1:0] forword_path_B;
+	logic        RegWriteE     ;
+	logic        MemWriteE     ;
+	logic        JumpE         ;
+	logic        BranchE       ;
+	logic        ALUSrcE       ;
+	logic        Zero          ;
+
+	logic [31:0] ALUResultM;
+	logic [31:0] RD2M      ;
+	logic [31:0] PCPlus4M  ;
+	logic [31:0] ReadDataM ;
+	logic [ 4:0] WriteAddM ;
+	logic [ 1:0] ResultSrcM;
+	logic        RegWriteM ;
+	logic        MemWriteM ;
+	logic        SS11      ;
+
+	logic [31:0] ReadDataW ;
+	logic [31:0] ALUResultW;
+	logic [31:0] PCPlus4W  ;
+	logic [ 1:0] ResultSrcW;
+
+//	Mux2by1 #(32) pcmux (PCPlus4,PCTargetE,PCSrc,PCNext1);
+
+	assign PCNext1 = (PCSrc)? (PCTargetE) : (PCPlus4);
+
+	flipflop #(
+		.WIDTH(32)
+		) flipflop_0 (
+		.clk  (clk    ),
+		.reset(reset  ),
+		.ST   (1'b0   ),
+		.d    (PCNext1),
+		.q    (PC     )
+	);
+
+// ---------------------------------------------------------------------------------------------------------------
+// -------------------------------- FETCHING THE INSTRUCTION -----------------------------------------------------
+// ---------------------------------------------------------------------------------------------------------------
+
+//	FF32 #(32) ff0 (clk,reset,PCNext1,PC);
+//	Mux2by1 #(32) stall2 (PC,PCNext1,SS1,PCNext);
+//	Mux2by1 #(32) stall1 (32'h00000013,InstrX,!PCSrc,Instr);
+//	add_sub a0 (1'b1,PC,32'd4,PCPlus41);
+//	Mux2by1 #(32) st2 (PC,PCPlus41,SS1,PCPlus4);
+//	InstructionMemory IM (PCNext,clk,InstrX,reset);                    
+
+  assign PCNext  = (SS1)?   (PCNext1)  : (PC)    ;
+  assign Instr   = (PCSrc)? (32'h13)   : (InstrX);
+  assign PCPlus4 = (SS1)?   (PCPlus41) : (PC)    ;
+	
+	adder adder_0 (
+		.in1(PC      ),
+		.in2(32'd4   ),
+		.out(PCPlus41)
+	);
+
+	flipflop #(.WIDTH(107)) flipflop_1 (
+		.clk  (clk                                             ),
+		.reset(reset                                           ),
+		.ST   (1'b0                                            ),
+		.d    ({Instr,PC,PCPlus4,Instr[19:15],Instr[24:20],SS1}),
+		.q    ({InstrL,PCD,PCPlus4D,IS1,IS2,SS11}              )
+	);
+
+//	FF32 #(107) ff1 (clk,reset,{Instr,PC,PCPlus4,Instr[19:15],Instr[24:20],SS1},{InstrL,PCD,PCPlus4D,IS1,IS2,SS11});
+
+// ---------------------------------------------------------------------------------------------------------------
+// -------------------------------- DECODING THE INSTRUCTION -----------------------------------------------------
+// ---------------------------------------------------------------------------------------------------------------
+
+//	Mux2by1 #(32) ins (InstrL,InstrK,!SS11,InstrY);
+//	Mux2by1 #(32) ins1 (InstrY,32'h00000013,PCSrc,InstrD);
+//	Controller2 c (
+//		InstrD[6:0], InstrD[14:12], InstrD[30],ResultSrc, ImmSrc, MemWrite,
+//		Branch,ALUSrc, RegWrite, Jump, ALUControl,SS2
+//	);
+//	Register1 rff (clk,RegWriteW,InstrD[19:15],InstrD[24:20],WriteAddW,WriteDataW,RD1,RD2);
+//	Extend ext (InstrD[31:7],ImmSrc,ImmExt);
+//	HazardUnit HU (ResultSrcE[0],WriteAddE,IS1,IS2,SS1,SS2,PCSrc);
+
+	assign InstrY = (SS11)?  (InstrL) : (InstrK);
+	assign InstrD = (PCSrc)? (32'h13) : (InstrY);
+
+	controller controller (
+		.op        (InstrD[6:0]  ),
+		.funct3    (InstrD[14:12]),
+		.funct7b5  (InstrD[30]   ),
+		.SS2       (SS2          ),
+		.funct7b1  (InstrD[25]   ),
+		.MemWrite  (MemWrite     ),
+		.Branch    (Branch       ),
+		.ALUSrc    (ALUSrc       ),
+		.RegWrite  (RegWrite     ),
+		.Jump      (Jump         ),
+		.ALUControl(ALUControl   ),
+		.ResultSrc (ResultSrc    ),
+		.ImmSrc    (ImmSrc       )
+	);
+
+	register_up register_up (
+		.clk         (clk          ),
+		.reset       (reset        ),
+		.write_enable(RegWriteW    ),
+		.read_addr1  (InstrD[19:15]),
+		.read_addr2  (InstrD[24:20]),
+		.write_addr  (WriteAddW    ),
+		.write_data  (WriteDataW   ),
+		.read_data1  (RD1          ),
+		.read_data2  (RD2          )
+	);
+
+	extend extend (
+		.instr (InstrD[31:7]),
+		.immsrc(ImmSrc      ),
+		.immext(ImmExt      )
+	);
+
+	hazardunit hazardunit (
+		.ResultSrcE(ResultSrcE[0]),
+		.PCSrc     (PCSrc        ),
+		.WriteAddE (WriteAddE    ),
+		.rs1       (IS1          ),
+		.rs2       (IS2          ),
+		.SS1       (SS1          ),
+		.SS2       (SS2          )
+	);
+
+	flipflop #(
+		.WIDTH(220)
+		) flipflop_2 (
+		.clk  (clk                                                                            ),
+		.reset(reset                                                                          ),
+		.ST   (1'b0                                                                           ),
+		.d    ({RegWrite,ResultSrc,MemWrite,Jump,Branch,ALUControl,ALUSrc,RD1,RD2,PCD,
+		       InstrD[11:7],ImmExt,PCPlus4D,InstrD[19:15], InstrD[24:20],InstrD,InstrD[14:12]}),
+		.q    ({RegWriteE,ResultSrcE,MemWriteE,JumpE,BranchE,ALUControlE,ALUSrcE,
+		       RD1E,RD2E,PCE,WriteAddE,ImmExtE,PCPlus4E,rs1,rs2,InstrK,funct3}                )
+	);
+
+//	FF32 #(220) ff2 (
+//		clk, reset, {RegWrite,ResultSrc,MemWrite,Jump,Branch,ALUControl,ALUSrc,RD1,RD2,
+//		PCD,InstrD[11:7],ImmExt,PCPlus4D,InstrD[19:15], InstrD[24:20],InstrD,InstrD[14:12]}, {RegWriteE,ResultSrcE,MemWriteE,JumpE,BranchE,
+//		ALUControlE,ALUSrcE,RD1E,RD2E,PCE,WriteAddE,ImmExtE,PCPlus4E,rs1,rs2,InstrK,funct3}
+//	);
+
+// ---------------------------------------------------------------------------------------------------------------
+// -------------------------------- EXECUTING THE INSTRUCTION -----------------------------------------------------
+// ---------------------------------------------------------------------------------------------------------------
+
+//	Mux3by1 #(32) muxA (RD1E,ALUResultM,WriteDataW,A,A32);
+//	Mux3by1 #(32) muxB (RD2E,ALUResultM,WriteDataW,B,B32);
+//	Mux2by1 #(32) srcbmux (B32,ImmExtE,ALUSrcE,SrcE);
+//	ALU2 alu (A32,SrcE,ALUControlE,ALUResultE,Zero,funct3);
+//	add_sub a1 (1'b1,PCE,ImmExtE,PCTargetE);
+//	ForwardingUnit fdu (WriteAddM,WriteAddW,rs1,rs2,RegWriteM,RegWriteW,A,B);
+
+  assign A32  = (forword_path_A[1])? (WriteDataW) : ((forword_path_A[0])? ALUResultM : RD1E );
+  assign B32  = (forword_path_B[1])? (WriteDataW) : ((forword_path_B[0])? ALUResultM : RD2E );
+	assign SrcE = (ALUSrcE)? (ImmExtE) : (B32);  
+
+	ALU ALU (
+		.A        (A32        ),
+		.B        (SrcE       ),
+		.ALUOp    (ALUControlE),
+		.funct3   (funct3     ),
+		.ALUResult(ALUResultE ),
+		.zero     (Zero       )
+	);
+
+	adder adder_1 (
+		.in1(PCE      ),
+		.in2(ImmExtE  ),
+		.out(PCTargetE)
+	);
+
+  forwardingunit forwardingunit (
+		.rdM           (WriteAddM     ),
+		.rdW           (WriteAddW     ),
+		.rs1           (rs1           ),
+		.rs2           (rs2           ),
+		.RegWriteM     (RegWriteM     ),
+		.RegWriteW     (RegWriteW     ),
+		.forword_path_A(forword_path_A),
+		.forword_path_B(forword_path_B)
+	);
+  
+	always_comb begin
+		if((BranchE & Zero) | JumpE)
+			PCSrc = 1;
+		else
+			PCSrc = 0;
+	end
+
+	flipflop #(
+		.WIDTH(105)
+		) flipflop_3 (
+		.clk  (clk                                                                ),
+		.reset(reset                                                              ),
+		.ST   (1'b0                                                               ),
+		.d    ({RegWriteE,ResultSrcE,MemWriteE,ALUResultE,B32,WriteAddE,PCPlus4E} ),
+		.q    ({RegWriteM,ResultSrcM,MemWriteM,ALUResultM,RD2M,WriteAddM,PCPlus4M})
+	);
+
+//	FF32 #(105) ff3 (
+//		clk, reset, {RegWriteE,ResultSrcE,MemWriteE,ALUResultE,B32,WriteAddE,PCPlus4E},
+//		{RegWriteM,ResultSrcM,MemWriteM,ALUResultM,RD2M,WriteAddM,PCPlus4M}
+//	);
+
+// ---------------------------------------------------------------------------------------------------------------
+// -------------------------------- READ/WRITE MEMORY ------------------------------------------------------------
+// ---------------------------------------------------------------------------------------------------------------
+
+//	DataMemory DM (clk,ALUResultE,B32,MemWriteE,ReadDataM);
+
+	memory memory_0 (
+		.aclr     (reset                   ),
+		.address_a({PCNext    [15:2],2'b00}),
+		.address_b({ALUResultE[15:2],2'b00}),
+		.clock    (clk                     ),
+		.data_a   (8'b0                    ),
+		.data_b   (B32       [7:0]         ),
+		.wren_a   (1'b0                    ),
+		.wren_b   (MemWriteE               ),
+		.q_a      (InstrX    [7:0]         ),
+		.q_b      (ReadDataM [7:0]         )
+	);
+
+	memory memory_1 (
+		.aclr     (reset                   ),
+		.address_a({PCNext    [15:2],2'b01}),
+		.address_b({ALUResultE[15:2],2'b01}),
+		.clock    (clk                     ),
+		.data_a   (8'b0                    ),
+		.data_b   (B32       [15:8]        ),
+		.wren_a   (1'b0                    ),
+		.wren_b   (MemWriteE               ),
+		.q_a      (InstrX    [15:8]        ),
+		.q_b      (ReadDataM [15:8]        )
+	);
+
+	memory memory_2 (
+		.aclr     (reset                   ),
+		.address_a({PCNext    [15:2],2'b10}),
+		.address_b({ALUResultE[15:2],2'b10}),
+		.clock    (clk                     ),
+		.data_a   (8'b0                    ),
+		.data_b   (B32       [23:16]       ),
+		.wren_a   (1'b0                    ),
+		.wren_b   (MemWriteE               ),
+		.q_a      (InstrX    [23:16]       ),
+		.q_b      (ReadDataM [23:16]       )
+	);
+
+	memory memory_3 (
+		.aclr     (reset                   ),
+		.address_a({PCNext    [15:2],2'b11}),
+		.address_b({ALUResultE[15:2],2'b11}),
+		.clock    (clk                     ),
+		.data_a   (8'b0                    ),
+		.data_b   (B32       [31:24]       ),
+		.wren_a   (1'b0                    ),
+		.wren_b   (MemWriteE               ),
+		.q_a      (InstrX    [31:24]       ),
+		.q_b      (ReadDataM [31:24]       )
+	);
+
+	flipflop #(
+		.WIDTH(104)
+		) flipflop_4 (
+		.clk  (clk                                                           ),
+		.reset(reset                                                         ),
+		.ST   (1'b0                                                          ),
+		.d    ({RegWriteM,ResultSrcM,ALUResultM,ReadDataM,WriteAddM,PCPlus4M}),
+		.q    ({RegWriteW,ResultSrcW,ALUResultW,ReadDataW,WriteAddW,PCPlus4W})
+	);
+
+//	FF32 #(104) ff4 (
+//		clk, reset, {RegWriteM,ResultSrcM,ALUResultM,ReadDataM,WriteAddM,PCPlus4M},
+//		{RegWriteW,ResultSrcW,ALUResultW,ReadDataW,WriteAddW,PCPlus4W}
+//	);
+
+// ---------------------------------------------------------------------------------------------------------------
+// -------------------------------- WRITE BACK IN REGISTER -------------------------------------------------------
+// ---------------------------------------------------------------------------------------------------------------
+
+//	Mux3by1 #(32) resultmux (ALUResultW,ReadDataW,PCPlus4W,ResultSrcW,WriteDataW);
+	assign WriteDataW = (ResultSrcW[1])? (PCPlus4W) : ((ResultSrcW[0])? (ReadDataW) : (ALUResultW));
+
+endmodule
